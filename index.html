@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FunVote - Ո՞վ է Ամենահավանականը</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #fd79a8;
+            --success: #00b894;
+            --dark-bg: #0f0c1b;
+            --card-bg: #1a162e;
+            --text: #f5f6fa;
+            --gold: #f1c40f;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--dark-bg); color: var(--text);
+            margin: 0; padding: 15px; text-align: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container {
+            max-width: 600px; margin: auto; background: var(--card-bg);
+            padding: 20px; border-radius: 24px; border: 1px solid #3d3460;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { color: var(--primary); margin-top: 0; font-size: 2.2em; text-shadow: 0 0 10px rgba(108,92,231,0.3); }
+        h2 { color: var(--gold); }
+        
+        button {
+            width: 100%; padding: 15px; margin-top: 12px; border-radius: 12px; border: none;
+            font-size: 1.1em; cursor: pointer; font-weight: bold; text-transform: uppercase;
+            transition: 0.2s; touch-action: manipulation;
+        }
+        button:disabled { background: #444 !important; color: #888 !important; cursor: not-allowed; }
+        
+        .btn-host { background: var(--primary); color: white; }
+        .btn-join { background: var(--secondary); color: white; }
+        .btn-vote { background: #2f284e; color: white; border: 1px solid #514485; text-transform: none; font-size: 1.2em;}
+        .btn-vote:active { background: var(--primary); }
+        .btn-control { background: var(--success); color: white; }
+        .btn-danger { background: #d63031; color: white; }
+        .btn-add-q { background: #e84393; color: white; padding: 10px; font-size: 0.9em; margin-top: 5px; }
+        
+        input[type="number"], input[type="text"] {
+            width: 100%; padding: 15px; background: #0b0816; border: 1px solid #3d3460; color: white;
+            border-radius: 12px; box-sizing: border-box; font-size: 1.1em; margin-bottom: 12px; text-align: center;
+        }
+        
+        .lobby-list, .results-list {
+            background: #0b0816; padding: 15px; border-radius: 14px; 
+            margin: 15px 0; text-align: left; max-height: 250px; overflow-y: auto;
+        }
+        .player-row {
+            padding: 10px 15px; margin-bottom: 8px; background: #1e1938;
+            border-radius: 8px; display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .question-box {
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            padding: 25px 20px; border-radius: 18px; font-size: 1.4em;
+            font-weight: bold; color: white; margin: 20px 0; box-shadow: 0 5px 15px rgba(108,92,231,0.4);
+        }
+        
+        .result-bar-container {
+            margin-bottom: 15px; background: #130f24; border-radius: 10px; padding: 12px; border-left: 5px solid var(--gold);
+        }
+        .result-info { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        
+        .badge { background: #3d3460; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; color: var(--gold); }
+        .hidden { display: none !important; }
+        
+        .custom-q-section {
+            background: #130f24; padding: 15px; border-radius: 14px; border: 1px dashed #514485; margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="auth-panel">
+        <h1>🤔 FunVote</h1>
+        <p style="color:#a29bfe;">Ո՞վ է ամենահավանականը... քվեարկեք անոնիմ</p>
+        <hr style="border-color: #2f284e; margin: 20px 0;">
+        
+        <input type="text" id="p-name" placeholder="Մուտքագրեք Ձեր անունը">
+        <button class="btn-host" onclick="createRoom()">➕ ՍՏԵՂԾԵԼ ՆՈՐ ՍԵՆՅԱԿ</button>
+        
+        <div style="margin: 20px 0; color: #514485;">— ԿԱՄ —</div>
+        
+        <input type="number" id="join-code" placeholder="Սենյակի կոդը">
+        <button class="btn-join" id="btn-join-submit" onclick="joinRoom()">🔗 ՄԻԱՆԱԼ ՍԵՆՅԱԿԻՆ</button>
+    </div>
+
+    <div id="lobby-panel" class="hidden">
+        <h2>📌 Սենյակի Կոդը՝ <span id="room-code-txt" style="color:var(--secondary);">----</span></h2>
+        
+        <div class="custom-q-section">
+            <span style="font-size: 0.9em; color: #a29bfe; font-weight: bold;">✍️ Ավելացրեք Ձեր սեփական հարցը.</span>
+            <input type="text" id="custom-question-input" placeholder="Օրինակ՝ Ո՞վ է ամենաշատը ստում..." style="margin-top: 8px; padding: 10px; font-size: 0.95em;">
+            <button class="btn-add-q" onclick="addCustomQuestion()">➕ ԱՎԵԼԱՑՆԵԼ ՑՈՒՑԱԿԻՆ</button>
+            <div id="q-counter-msg" style="font-size: 0.85em; color: var(--success); margin-top: 5px;"></div>
+        </div>
+
+        <div class="lobby-list" id="lobby-players-container"></div>
+        
+        <div id="host-controls" class="hidden">
+            <button class="btn-control" onclick="nextQuestion()">🚀 ՍԿՍԵԼ / ՀԱՋՈՐԴ ՀԱՐՑԸ</button>
+        </div>
+        <div id="player-status" style="color: var(--gold); font-weight: bold;"></div>
+        
+        <button class="btn-danger" onclick="leaveRoom()" style="margin-top:20px;">🛑 ԵԼՔ</button>
+    </div>
+
+    <div id="game-panel" class="hidden">
+        <div style="font-size: 0.9em; color:#aaa;">ՀԱՐՑԸ</div>
+        <div class="question-box" id="current-question-txt">Բեռնվում է...</div>
+        
+        <div id="voting-area">
+            <h3>🗳️ Ընտրեք համապատասխան մասնակցին.</h3>
+            <div id="voting-buttons-container"></div>
+        </div>
+
+        <div id="results-area" class="hidden">
+            <h2 style="color:var(--success);">📊 ՔՎԵԱՐԿՈՒԹՅԱՆ ԱՐԴՅՈՒՆՔՆԵՐԸ</h2>
+            <div class="results-list" id="results-container"></div>
+            
+            <div id="host-next-area" class="hidden">
+                <button class="btn-control" onclick="nextQuestion()">➡️ ՀԱՋՈՐԴ ՀԱՐՑԸ</button>
+            </div>
+            <div id="player-wait-msg" style="color:var(--gold); font-weight:bold;" class="hidden">Խաղավարը շուտով կփոխի հարցը...</div>
+        </div>
+
+        <div id="host-game-controls" class="hidden" style="margin-top: 20px; border-top: 1px solid #3d3460; padding-top: 15px;">
+            <button class="btn-danger" style="background:#e67e22;" id="btn-stop-vote" onclick="stopVoting()">🛑 ՓԱԿԵԼ ՔՎԵԱՐԿՈՒԹՅՈՒՆԸ ՁԵՌՔՈՎ</button>
+        </div>
+
+        <button class="btn-danger" onclick="leaveRoom()" style="margin-top:30px; padding:10px;">🛑 ԼՔԵԼ ԽԱՂԸ</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDioEbxtAS5wuVGDUuZBf-yTk_qjItE0hM",
+        authDomain: "mafia-83663.firebaseapp.com",
+        databaseURL: "https://mafia-83663-default-rtdb.firebaseio.com",
+        projectId: "mafia-83663",
+        storageBucket: "mafia-83663.firebasestorage.app",
+        messagingSenderId: "686983745870",
+        appId: "1:686983745870:web:2f2d8c03cd0a5b625b0e1f"
+    };
+
+    // Լռելյայն պատրաստի հարցերը
+    const defaultQuestions = [
+        "Ո՞վ ավելի շուտ կհարստանա երազներում:",
+        "Ո՞վ է ամենաշատը ուշանում հանդիպումներից:",
+        "Ո՞վ է խաղի ընթացքում թաքուն ինչ-որ բան ուտում:",
+        "Ո՞վ ավելի շուտ հիմար իրավիճակի մեջ կընկնի:",
+        "Ո՞վ է ամենաանհասկանալի կատակներ անում:",
+        "Ո՞վ կարող է մեկ օրում ծախսել իր ամբողջ փողը:",
+        "Ո՞վ է ամենաշատը խոսում հեռախոսով:",
+        "Ո՞վ ավելի շուտ կդառնա հայտնի բլոգեր:",
+        "Ո՞վ է խմբի մեջ ամենաքնկոտը:",
+        "Ո՞վ է սիրում վիճել, նույնիսկ եթե գիտի, որ սխալ է:",
+        "Ո՞վ ավելի շուտ կմոռանա, թե ինչի մասին էր խոսում:",
+        "Ո՞վ է խմբի գաղտնի «մաֆիոզը» կյանքում:",
+        "Ո՞վ ավելի շուտ կհավատա ամենապարզ ստին:"
+    ];
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    let currentRoomCode = "";
+    let myId = "";
+    let isHost = false;
+    let localQuestionsList = [...defaultQuestions]; // Այստեղ կպահվեն թե՛ հին, թե՛ նոր հարցերը
+
+    window.onload = () => {
+        const savedName = localStorage.getItem('fun_player_name');
+        if(savedName) document.getElementById('p-name').value = savedName;
+    };
+
+    function screen(id) {
+        document.querySelectorAll('.container > div').forEach(d => d.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+
+    // ՍՏԵՂԾԵԼ ՍԵՆՅԱԿ
+    function createRoom() {
+        let name = document.getElementById('p-name').value.trim();
+        if(!name) return alert("Խնդրում ենք գրել Ձեր անունը");
+        localStorage.setItem('fun_player_name', name);
+
+        isHost = true;
+        currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
+        document.getElementById('room-code-txt').innerText = currentRoomCode;
+
+        db.ref('fun_rooms/' + currentRoomCode).set({
+            status: "lobby",
+            currentQuestion: "",
+            voteStatus: "idle",
+            hostId: "host_player"
+        }).then(() => {
+            let pRef = db.ref('fun_rooms/' + currentRoomCode + '/players').push();
+            myId = pRef.key;
+            pRef.set({ name: name, isHost: true });
+            
+            pRef.onDisconnect().remove();
+            listenToRoom();
+            screen('lobby-panel');
+            document.getElementById('host-controls').classList.remove('hidden');
+        });
+    }
+
+    // ՄԻԱՆԱԼ ՍԵՆՅԱԿԻՆ
+    function joinRoom() {
+        let name = document.getElementById('p-name').value.trim();
+        let code = document.getElementById('join-code').value.trim();
+        if(!name || !code) return alert("Լրացեք անունը և սենյակի կոդը");
+        
+        const joinBtn = document.getElementById('btn-join-submit');
+        joinBtn.disabled = true;
+
+        localStorage.setItem('fun_player_name', name);
+
+        db.ref('fun_rooms/' + code).once('value', snap => {
+            if(!snap.exists()) {
+                alert("Սենյակը չի գտնվել:");
+                joinBtn.disabled = false;
+                return;
+            }
+
+            currentRoomCode = code;
+            document.getElementById('room-code-txt').innerText = currentRoomCode;
+            
+            let pRef = db.ref('fun_rooms/' + code + '/players').push();
+            myId = pRef.key;
+            pRef.set({ name: name, isHost: false });
+
+            pRef.onDisconnect().remove();
+            listenToRoom();
+            screen('lobby-panel');
+            document.getElementById('player-status').innerText = "Դուք հաջողությամբ միացել եք: Սպասեք խաղի սկզբին:";
+            joinBtn.disabled = false;
+        });
+    }
+
+    // ՍԵՓԱԿԱՆ ՀԱՐՑԻ ԱՎԵԼԱՑՈՒՄ (Ցանկացած խաղացողի կողմից)
+    function addCustomQuestion() {
+        let inputField = document.getElementById('custom-question-input');
+        let text = inputField.value.trim();
+        if(!text) return alert("Գրեք հարցը:");
+
+        // Ուղարկում ենք Firebase-ի հատուկ բաժին
+        db.ref('fun_rooms/' + currentRoomCode + '/customQuestions').push(text).then(() => {
+            inputField.value = ""; // Մաքրում ենք դաշտը
+            let counterMsg = document.getElementById('q-counter-msg');
+            counterMsg.innerText = "✓ Հարցը հաջողությամբ ավելացվեց բազային:";
+            setTimeout(() => { counterMsg.innerText = ""; }, 3000);
+        });
+    }
+
+    // ԼՍԵԼ ՍԵՆՅԱԿԻՆ
+    function listenToRoom() {
+        // 1. Խաղացողների թարմացում
+        db.ref('fun_rooms/' + currentRoomCode + '/players').on('value', snap => {
+            if(!snap.exists()) return;
+            let players = snap.val();
+            
+            let lobbyHtml = "";
+            Object.values(players).forEach(p => {
+                lobbyHtml += `<div class="player-row"><span>👤 ${p.name}</span> ${p.isHost ? '<span class="badge">Խաղավար</span>' : ''}</div>`;
+            });
+            document.getElementById('lobby-players-container').innerHTML = lobbyHtml;
+
+            let voteHtml = "";
+            Object.keys(players).forEach(pId => {
+                voteHtml += `<button class="btn-vote" onclick="submitMyVote('${pId}')">👤 ${players[pId].name}</button>`;
+            });
+            document.getElementById('voting-buttons-container').innerHTML = voteHtml;
+        });
+
+        // 2. Լսել սեփական ավելացված հարցերը և միացնել հին հարցերին
+        db.ref('fun_rooms/' + currentRoomCode + '/customQuestions').on('value', snap => {
+            localQuestionsList = [...defaultQuestions]; // Վերականգնում ենք ստանդարտ ցուցակը
+            if(snap.exists()) {
+                let customQs = Object.values(snap.val());
+                localQuestionsList = localQuestionsList.concat(customQs); // Ավելացնում ենք նոր հարցերը
+            }
+        });
+
+        // 3. Խաղի ընթացքի թարմացում
+        db.ref('fun_rooms/' + currentRoomCode).on('value', snap => {
+            if(!snap.exists()) return;
+            let room = snap.val();
+
+            if(room.status === "playing") {
+                screen('game-panel');
+                document.getElementById('current-question-txt').innerText = room.currentQuestion;
+                
+                if(room.voteStatus === "active") {
+                    document.getElementById('voting-area').classList.remove('hidden');
+                    document.getElementById('results-area').classList.add('hidden');
+                    if(isHost) {
+                        document.getElementById('host-game-controls').classList.remove('hidden');
+                    }
+                    
+                    // ԱՎՏՈՄԱՏ ԱՎԱՐՏԻ ՍՏՈՒԳՈՒՄ
+                    if(room.players && room.votes) {
+                        let totalPlayers = Object.keys(room.players).length;
+                        let totalVotes = Object.keys(room.votes).length;
+                        
+                        if(totalVotes >= totalPlayers && isHost) {
+                            stopVoting();
+                        }
+                    }
+
+                } else if(room.voteStatus === "finished") {
+                    document.getElementById('voting-area').classList.add('hidden');
+                    document.getElementById('results-area').classList.remove('hidden');
+                    document.getElementById('host-game-controls').classList.add('hidden');
+                    
+                    if(isHost) {
+                        document.getElementById('host-next-area').classList.remove('hidden');
+                    } else {
+                        document.getElementById('player-wait-msg').classList.remove('hidden');
+                    }
+                    showFinalResults(room.votes, room.players);
+                }
+            }
+        });
+    }
+
+    // ՀԱՋՈՐԴ ՀԱՐՑԸ
+    function nextQuestion() {
+        // Ընտրում ենք պատահական հարց թարմացված ցուցակից (որտեղ արդեն կան նաև սեփական գրածները)
+        let randomQ = localQuestionsList[Math.floor(Math.random() * localQuestionsList.length)];
+        
+        db.ref('fun_rooms/' + currentRoomCode).update({
+            status: "playing",
+            currentQuestion: randomQ,
+            voteStatus: "active",
+            votes: {} 
+        });
+    }
+
+    function submitMyVote(votedPlayerId) {
+        db.ref('fun_rooms/' + currentRoomCode + '/votes/' + myId).set(votedPlayerId).then(() => {
+            document.getElementById('voting-area').innerHTML = `<h3>✓ Ձեր անոնիմ ձայնը գրանցված է: Սպասում ենք մյուսներին...</h3>`;
+        });
+    }
+
+    function stopVoting() {
+        db.ref('fun_rooms/' + currentRoomCode).update({ voteStatus: "finished" });
+    }
+
+    function showFinalResults(votes, players) {
+        let counts = {};
+        Object.keys(players).forEach(pId => counts[pId] = 0);
+
+        if(votes) {
+            Object.values(votes).forEach(votedId => {
+                if(counts[votedId] !== undefined) counts[votedId]++;
+            });
+        }
+
+        let sorted = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+
+        let html = "";
+        sorted.forEach(pId => {
+            let pName = players[pId] ? players[pId].name : "Լքած խաղացող";
+            let voteCount = counts[pId];
+            html += `
+                <div class="result-bar-container">
+                    <div class="result-info">
+                        <span>👤 ${pName}</span>
+                        <span style="color:var(--gold);">${voteCount} ձայն</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('results-container').innerHTML = html;
+        
+        document.getElementById('voting-area').innerHTML = `
+            <h3>🗳️ Ընտրեք համապատասխան մասնակցին.</h3>
+            <div id="voting-buttons-container"></div>
+        `;
+        let voteHtml = "";
+        Object.keys(players).forEach(pId => {
+            voteHtml += `<button class="btn-vote" onclick="submitMyVote('${pId}')">👤 ${players[pId].name}</button>`;
+        });
+        document.getElementById('voting-buttons-container').innerHTML = voteHtml;
+    }
+
+    function leaveRoom() {
+        if(confirm("Ցանկանո՞ւմ եք դուրս գալ խաղից:")) {
+            if(isHost) {
+                db.ref('fun_rooms/' + currentRoomCode).remove().then(() => { location.reload(); });
+            } else {
+                db.ref('fun_rooms/' + currentRoomCode + '/players/' + myId).remove().then(() => { location.reload(); });
+            }
+        }
+    }
+</script>
+</body>
+</html>
