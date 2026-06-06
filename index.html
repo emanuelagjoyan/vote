@@ -43,7 +43,8 @@
         .btn-vote:active { background: var(--primary); }
         .btn-control { background: var(--success); color: white; }
         .btn-danger { background: #d63031; color: white; }
-        .btn-add-q { background: #e84393; color: white; padding: 10px; font-size: 0.9em; margin-top: 5px; }
+        .btn-kick { background: #ff7675; color: white; padding: 5px 10px; border-radius: 8px; font-size: 0.8em; width: auto; margin-top: 0; text-transform: none; }
+        .btn-add-q { background: #e84393; color: white; padding: 12px; font-size: 1em; margin-top: 5px; }
         
         input[type="number"], input[type="text"] {
             width: 100%; padding: 15px; background: #0b0816; border: 1px solid #3d3460; color: white;
@@ -52,7 +53,7 @@
         
         .lobby-list, .results-list {
             background: #0b0816; padding: 15px; border-radius: 14px; 
-            margin: 15px 0; text-align: left; max-height: 250px; overflow-y: auto;
+            margin: 15px 0; text-align: left; max-height: 200px; overflow-y: auto;
         }
         .player-row {
             padding: 10px 15px; margin-bottom: 8px; background: #1e1938;
@@ -74,8 +75,21 @@
         .hidden { display: none !important; }
         
         .custom-q-section {
-            background: #130f24; padding: 15px; border-radius: 14px; border: 1px dashed #514485; margin-top: 15px;
+            background: #130f24; padding: 15px; border-radius: 14px; border: 1px dashed #514485; margin: 15px 0;
         }
+
+        .chat-section {
+            margin-top: 25px; border-top: 2px solid #2f284e; padding-top: 15px; text-align: left;
+        }
+        .chat-box {
+            background: #0b0816; height: 130px; overflow-y: auto; padding: 10px;
+            border-radius: 12px; border: 1px solid #3d3460; margin-bottom: 10px;
+        }
+        .chat-msg { margin-bottom: 6px; font-size: 0.95em; word-break: break-word; }
+        .chat-name { color: var(--secondary); font-weight: bold; }
+        .chat-input-container { display: flex; gap: 8px; }
+        .chat-input-container input { margin-bottom: 0; padding: 10px; font-size: 1em; text-align: left; }
+        .chat-send-btn { width: auto; margin-top: 0; padding: 0 20px; background: var(--primary); color: white; }
     </style>
 </head>
 <body>
@@ -99,16 +113,17 @@
         <h2>📌 Սենյակի Կոդը՝ <span id="room-code-txt" style="color:var(--secondary);">----</span></h2>
         
         <div class="custom-q-section">
-            <span style="font-size: 0.9em; color: #a29bfe; font-weight: bold;">✍️ Ավելացրեք Ձեր սեփական հարցը.</span>
-            <input type="text" id="custom-question-input" placeholder="Օրինակ՝ Ո՞վ է ամենաշատը ստում..." style="margin-top: 8px; padding: 10px; font-size: 0.95em;">
-            <button class="btn-add-q" onclick="addCustomQuestion()">➕ ԱՎԵԼԱՑՆԵԼ ՑՈՒՑԱԿԻՆ</button>
-            <div id="q-counter-msg" style="font-size: 0.85em; color: var(--success); margin-top: 5px;"></div>
+            <span style="font-size: 1em; color: #a29bfe; font-weight: bold;">📝 ՀԱՐՑ ՏԱԼ (Առաջնահերթ հարց)</span>
+            <input type="text" id="custom-question-input-lobby" placeholder="Գրեք Ձեր հարցը այստեղ..." style="margin-top: 8px;">
+            <button class="btn-add-q" onclick="addCustomQuestion('lobby')">📥 ԱՎԱՐՏԵԼ (ԱՎԵԼԱՑՆԵԼ)</button>
+            <div id="q-counter-msg-lobby" style="font-size: 0.85em; color: var(--success); margin-top: 5px;"></div>
         </div>
 
+        <h3>👥 Մասնակիցներ սպասասրահում.</h3>
         <div class="lobby-list" id="lobby-players-container"></div>
         
         <div id="host-controls" class="hidden">
-            <button class="btn-control" onclick="nextQuestion()">🚀 ՍԿՍԵԼ / ՀԱՋՈՐԴ ՀԱՐՑԸ</button>
+            <button class="btn-control" onclick="nextQuestion()">🚀 ՍԿՍԵԼ ԽԱՂԸ</button>
         </div>
         <div id="player-status" style="color: var(--gold); font-weight: bold;"></div>
         
@@ -116,12 +131,24 @@
     </div>
 
     <div id="game-panel" class="hidden">
-        <div style="font-size: 0.9em; color:#aaa;">ՀԱՐՑԸ</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <span style="font-size: 0.9em; color:#aaa;">ՀԱՐՑԸ</span>
+            <span class="badge" style="background:#2f284e;">Կոդ՝ <span id="game-room-code-txt">----</span></span>
+        </div>
         <div class="question-box" id="current-question-txt">Բեռնվում է...</div>
         
         <div id="voting-area">
-            <h3>🗳️ Ընտրեք համապատասխան մասնակցին.</h3>
-            <div id="voting-buttons-container"></div>
+            <div id="vote-prompt-zone">
+                <h3>🗳️ Ընտրեք համապատասխան մասնակցին.</h3>
+                <div id="voting-buttons-container"></div>
+            </div>
+            <div id="vote-voted-msg" class="hidden">
+                <h3>✓ Ձեր անոնիմ ձայնը գրանցված է: Սպասում ենք մյուսներին...</h3>
+            </div>
+            
+            <div id="host-stop-vote-area" class="hidden" style="margin-top: 20px;">
+                <button class="btn-danger" style="background: #e17055;" onclick="stopVoting()">🛑 ԱՎԱՐՏԵԼ ՔՎԵԱՐԿՈՒԹՅՈՒՆԸ</button>
+            </div>
         </div>
 
         <div id="results-area" class="hidden">
@@ -134,11 +161,23 @@
             <div id="player-wait-msg" style="color:var(--gold); font-weight:bold;" class="hidden">Խաղավարը շուտով կփոխի հարցը...</div>
         </div>
 
-        <div id="host-game-controls" class="hidden" style="margin-top: 20px; border-top: 1px solid #3d3460; padding-top: 15px;">
-            <button class="btn-danger" style="background:#e67e22;" id="btn-stop-vote" onclick="stopVoting()">🛑 ՓԱԿԵԼ ՔՎԵԱՐԿՈՒԹՅՈՒՆԸ ՁԵՌՔՈՎ</button>
+        <div class="custom-q-section">
+            <span style="font-size: 0.95em; color: #fd79a8; font-weight: bold;">📝 ՀԱՐՑ ՏԱԼ ԽԱՂԻ ԸՆԹԱՑՔՈՒՄ</span>
+            <input type="text" id="custom-question-input-game" placeholder="Ծագե՞ց նոր միտք, գրիր այստեղ..." style="margin-top: 8px; padding: 10px; font-size: 1em;">
+            <button class="btn-add-q" style="background: #6c5ce7;" onclick="addCustomQuestion('game')">📥 ԱՎԱՐՏԵԼ (ԳՑԵԼ ՀԵՐԹԻ ՄԵՋ)</button>
+            <div id="q-counter-msg-game" style="font-size: 0.85em; color: var(--success); margin-top: 5px;"></div>
         </div>
 
-        <button class="btn-danger" onclick="leaveRoom()" style="margin-top:30px; padding:10px;">🛑 ԼՔԵԼ ԽԱՂԸ</button>
+        <div class="chat-section">
+            <span style="font-size: 0.9em; color: #aaa; font-weight: bold;">💬 ԽԱՂԻ ՉԱՏ</span>
+            <div class="chat-box" id="chat-messages-box"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input-msg" placeholder="Գրեք նամակ...">
+                <button class="chat-send-btn" onclick="sendChatMessage()">➡️</button>
+            </div>
+        </div>
+
+        <button class="btn-danger" onclick="leaveRoom()" style="margin-top:20px; padding:10px;">🛑 ԼՔԵԼ ԽԱՂԸ</button>
     </div>
 </div>
 
@@ -153,21 +192,89 @@
         appId: "1:686983745870:web:2f2d8c03cd0a5b625b0e1f"
     };
 
-    // Լռելյայն պատրաստի հարցերը
     const defaultQuestions = [
-        "Ո՞վ ավելի շուտ կհարստանա երազներում:",
-        "Ո՞վ է ամենաշատը ուշանում հանդիպումներից:",
-        "Ո՞վ է խաղի ընթացքում թաքուն ինչ-որ բան ուտում:",
-        "Ո՞վ ավելի շուտ հիմար իրավիճակի մեջ կընկնի:",
-        "Ո՞վ է ամենաանհասկանալի կատակներ անում:",
-        "Ո՞վ կարող է մեկ օրում ծախսել իր ամբողջ փողը:",
-        "Ո՞վ է ամենաշատը խոսում հեռախոսով:",
-        "Ո՞վ ավելի շուտ կդառնա հայտնի բլոգեր:",
-        "Ո՞վ է խմբի մեջ ամենաքնկոտը:",
-        "Ո՞վ է սիրում վիճել, նույնիսկ եթե գիտի, որ սխալ է:",
-        "Ո՞վ ավելի շուտ կմոռանա, թե ինչի մասին էր խոսում:",
-        "Ո՞վ է խմբի գաղտնի «մաֆիոզը» կյանքում:",
-        "Ո՞վ ավելի շուտ կհավատա ամենապարզ ստին:"
+        "Ո՞վ ավելի շուտ կգնա խանութ՝ հողաթափերով ու գիշերազգեստով:",
+        "Ո՞վ ավելի շուտ կբարևի անծանոթին՝ կարծելով, թե իր ընկերն է:",
+        "Ո՞վ ավելի շուտ կկորչի սեփական թաղամասում:",
+        "Ո՞վ է ընդունակ հայելու մեջ իրեն տեսնելիս վախենալ:",
+        "Ո՞վ ավելի շուտ կթափի թեյը ստեղնաշարի վրա:",
+        "Ո՞վ է փողոցում քայլելիս միշտ հարվածում սյուներին կամ ծառերին:",
+        "Ո՞վ կարող է լուրջ դեմքով պատմել մի բան, որը հենց նոր է հորինել:",
+        "Ո՞վ ավելի շուտ կմտնի կանանց/տղամարդկանց զուգարան՝ սխալմամբ:",
+        "Ո՞վ ավելի շուտ կսկսի ծիծաղել ամենաանտեղի պահին (օրինակ՝ դասի ժամանակ):",
+        "Ո՞վ է միշտ մոռանում, թե ուր է դրել հեռախոսը, երբ այն հենց իր ձեռքում է:",
+        "Ո՞վ կարող է խանութում վիճել վաճառողի հետ 10 դրամի համար:",
+        "Ո՞վ ավելի շուտ կլսի երգը բարձրացրած ականջակալներով ու կսկսի բարձր երգել:",
+        "Ո՞վ է օրական 10 ժամ անցկացնում TikTok-ում կամ Reels-ում:",
+        "Ո՞վ ավելի շուտ կջնջի իր Instagram-ը՝ «նոր կյանք» սկսելու համար:",
+        "Ո՞վ ունի ամենաշատ գաղտնի (fake) էջերը:",
+        "Ո՞վ է նկարվում յուրաքանչյուր հայելու մեջ:",
+        "Ո՞վ ավելի շուտ կուղարկի հաղորդագրությունը հենց այն մարդուն, ում մասին գրում էր:",
+        "Ո՞վ է խմբի գլխավոր «մեմեր» ուղարկողը:",
+        "Ո՞վ է պատասխանում նամակներին 3 օր հետո:",
+        "Ո՞վ է տեսանյութեր նկարում, բայց երբեք չի հրապարակում:",
+        "Ո՞վ ունի հեռախոսի մեջ ամենաշատ անսովոր սքրինշոթները:",
+        "Ո՞վ ավելի շուտ կդառնա հայտնի սթրիմեր:",
+        "Ո՞վ է հեռախոսը միշտ պահում 1% լիցքավորմամբ:",
+        "Ո՞վ ավելի շուտ կխաբվի ինտերնետային խարդախներին:",
+        "Ո՞վ ավելի շուտ կդառնա միլիոնատեր:",
+        "Ո՞վ է դասից 5 րոպե առաջ արտագրում տնայինը:",
+        "Ո՞վ կարող է քննությունից առաջ ամբողջ գիշեր սովորել ու մեկ է՝ «2» ստանալ:",
+        "Ո՞վ է միշտ վիճում ուսուցիչների հետ:",
+        "Ո՞վ է դասի ժամանակ տետրի մեջ նկարում:",
+        "Ո՞վ ավելի շուտ կուշանա սեփական ավարտական երեկոյից:",
+        "Ո՞վ է դպրոցական բոլոր բամբասանքները առաջինն իմանում:",
+        "Ո՞վ ավելի շուտ կդառնա մեծ ընկերության տնօրեն:",
+        "Ո՞վ է միշտ կորցնում իր գրիչները:",
+        "Ո՞վ կարող է դասերից փախչել՝ քնելու համար:",
+        "Ո՞վ է գիշերը ժամը 3-ին սառնարանի մոտ «որսի» ելնում:",
+        "Ո՞վ կարող է ուտել ամբողջ պիցցան մենակով ու ասել՝ «դե, էդքան էլ սոված չէի»:",
+        "Ո՞վ է սուրճից կախվածություն ունի:",
+        "Ո՞վ է ատում սոխը կամ կանաչին ուտելիքի մեջ:",
+        "Ո՞վ է պատրաստում ամենահամով բաները:",
+        "Ո՞վ ավելի շուտ կայրի ձվածեղը:",
+        "Ո՞վ է խանութ գնում հացի համար, բայց վերադառնում 3 տոպրակ քաղցրավենիքով:",
+        "Ո՞վ է սիրում ուտել ուրիշի ափսեից:",
+        "Ո՞վ կարող է մեկ շաբաթ չլվանալ իր սիրելի հուդին (hoodie):",
+        "Ո՞վ է սենյակում կատարյալ թափթփվածություն սիրում:",
+        "Ո՞վ է խմբի մեջ ամենադրամատիկը (Drama Queen/King):",
+        "Ո՞վ է սիրահարվում շաբաթը 3 անգամ:",
+        "Ո՞վ ավելի շուտ կսկսի լացել տխուր ֆիլմ դիտելիս:",
+        "Ո՞վ է միշտ «պոզիտիվ» տարածում, նույնիսկ երբ ամեն ինչ վատ է:",
+        "Ո՞վ է ամենախանդոտը:",
+        "Ո՞վ է սիրում խորհուրդներ տալ, բայց ինքը երբեք դրանց չի հետևում:",
+        "Ո՞վ է ամենաառաջինը նեղանում կատակներից:",
+        "Ո՞վ կարող է գաղտնիքը պահել մինչև կյանքի վերջ:",
+        "Ո՞վ է միշտ կայացնում խենթ որոշումներ:",
+        "Ո՞վ է խմբի «մայրիկը» կամ «հայրիկը», որը բոլորին խնամում է:",
+        "Ո՞վ ավելի շուտ կնստի սխալ ավտոբուս:",
+        "Ո՞վ է ճամփորդության գնալիս վերցնում 3 ճամպրուկ հագուստ՝ 2 օրվա համար:",
+        "Ո՞վ ավելի շուտ կկորցնի անձնագիրը օդանավակայանում:",
+        "Ո՞վ է միշտ պատրաստ խենթ ճանապարհորդությունների:",
+        "Ո՞վ է արտասահմանում հայերեն խոսում օտարերկրացիների հետ՝ հուսալով, որ կհասկանան:",
+        "Ո՞վ ավելի շուտ կհայտնվի անմարդաբնակ կղզում:",
+        "Ո՞վ է ճանապարհին միշտ քնում:",
+        "Ո՞վ է ամբողջ ճամփան անցկացնում երգելով:",
+        "Ո՞վ է ամենաշատը հայելուն նայում:",
+        "Ո՞վ է միշտ պարտվում խաղերում:",
+        "Ո՞վ է սիրում սարսափ ֆիլմեր, բայց հետո վախենում է քնել:",
+        "Ո՞վ ավելի շուտ կդառնա դետեկտիվ:",
+        "Ո՞վ է ամենագնումներ անելու սիրահարը:",
+        "Ո՞վ է խմբի ամենաամաչկոտը անծանոթների հետ:",
+        "Ո՞վ է ամենաաղմկոտը հասարակական վայրերում:",
+        "Ո՞վ է միշտ մոռանում ծննդյան օրերը:",
+        "Ո՞վ ավելի շուտ կներկի մազերը կանաչ:",
+        "Ո՞վ է սիրում հին երգեր լսել:",
+        "Ո՞վ է միշտ փող չունի:",
+        "Ո՞վ ավելի շուտ կդառնա աստղագուշակ:",
+        "Ո՞վ է խմբի ամենասպորտայինը:",
+        "Ո՞վ է պատրաստ ժամերով խոսել իր ընտանի կենդանու մասին:",
+        "Ո՞վ ավելի շուտ կհավատա ՉԼՕ-ների (UFO) գոյությանը:",
+        "Ո՞վ է սիրում գիշերները փիլիսոփայել:",
+        "Ո՞վ ավելի շուտ կգնա ռոք համերգի:",
+        "Ո՞վ է միշտ դժգոհ եղանակից:",
+        "Ո՞վ է խմբի «Տեխնիկական աջակցությունը»:",
+        "Ո՞վ ավելի շուտ կդառնա գրքի հեղինակ:"
     ];
 
     firebase.initializeApp(firebaseConfig);
@@ -175,8 +282,10 @@
     
     let currentRoomCode = "";
     let myId = "";
+    let myName = "";
     let isHost = false;
-    let localQuestionsList = [...defaultQuestions]; // Այստեղ կպահվեն թե՛ հին, թե՛ նոր հարցերը
+    let priorityQuestionsList = [];
+    let roomRef;
 
     window.onload = () => {
         const savedName = localStorage.getItem('fun_player_name');
@@ -188,21 +297,22 @@
         document.getElementById(id).classList.remove('hidden');
     }
 
-    // ՍՏԵՂԾԵԼ ՍԵՆՅԱԿ
     function createRoom() {
         let name = document.getElementById('p-name').value.trim();
         if(!name) return alert("Խնդրում ենք գրել Ձեր անունը");
+        myName = name;
         localStorage.setItem('fun_player_name', name);
 
         isHost = true;
         currentRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
         document.getElementById('room-code-txt').innerText = currentRoomCode;
+        document.getElementById('game-room-code-txt').innerText = currentRoomCode;
 
-        db.ref('fun_rooms/' + currentRoomCode).set({
+        roomRef = db.ref('fun_rooms/' + currentRoomCode);
+        roomRef.set({
             status: "lobby",
             currentQuestion: "",
-            voteStatus: "idle",
-            hostId: "host_player"
+            voteStatus: "idle"
         }).then(() => {
             let pRef = db.ref('fun_rooms/' + currentRoomCode + '/players').push();
             myId = pRef.key;
@@ -215,18 +325,18 @@
         });
     }
 
-    // ՄԻԱՆԱԼ ՍԵՆՅԱԿԻՆ
     function joinRoom() {
         let name = document.getElementById('p-name').value.trim();
         let code = document.getElementById('join-code').value.trim();
-        if(!name || !code) return alert("Լրացեք անունը և սենյակի կոդը");
+        if(!name || !code) return alert("Լրացրեք անունը և սենյակի կոդը");
+        myName = name;
         
         const joinBtn = document.getElementById('btn-join-submit');
         joinBtn.disabled = true;
-
         localStorage.setItem('fun_player_name', name);
 
-        db.ref('fun_rooms/' + code).once('value', snap => {
+        roomRef = db.ref('fun_rooms/' + code);
+        roomRef.once('value', snap => {
             if(!snap.exists()) {
                 alert("Սենյակը չի գտնվել:");
                 joinBtn.disabled = false;
@@ -235,6 +345,7 @@
 
             currentRoomCode = code;
             document.getElementById('room-code-txt').innerText = currentRoomCode;
+            document.getElementById('game-room-code-txt').innerText = currentRoomCode;
             
             let pRef = db.ref('fun_rooms/' + code + '/players').push();
             myId = pRef.key;
@@ -242,57 +353,86 @@
 
             pRef.onDisconnect().remove();
             listenToRoom();
-            screen('lobby-panel');
-            document.getElementById('player-status').innerText = "Դուք հաջողությամբ միացել եք: Սպասեք խաղի սկզբին:";
+            
+            let roomData = snap.val();
+            if(roomData.status === "playing") {
+                screen('game-panel');
+            } else {
+                screen('lobby-panel');
+                document.getElementById('player-status').innerText = "Դուք միացել եք: Սպասեք խաղի սկզբին:";
+            }
             joinBtn.disabled = false;
         });
     }
 
-    // ՍԵՓԱԿԱՆ ՀԱՐՑԻ ԱՎԵԼԱՑՈՒՄ (Ցանկացած խաղացողի կողմից)
-    function addCustomQuestion() {
-        let inputField = document.getElementById('custom-question-input');
+    function addCustomQuestion(type) {
+        let inputField = document.getElementById(type === 'lobby' ? 'custom-question-input-lobby' : 'custom-question-input-game');
         let text = inputField.value.trim();
-        if(!text) return alert("Գրեք հարցը:");
+        if(!text) return alert("Խնդրում ենք դատարկ հարց չուղարկել:");
 
-        // Ուղարկում ենք Firebase-ի հատուկ բաժին
-        db.ref('fun_rooms/' + currentRoomCode + '/customQuestions').push(text).then(() => {
-            inputField.value = ""; // Մաքրում ենք դաշտը
-            let counterMsg = document.getElementById('q-counter-msg');
-            counterMsg.innerText = "✓ Հարցը հաջողությամբ ավելացվեց բազային:";
-            setTimeout(() => { counterMsg.innerText = ""; }, 3000);
+        db.ref('fun_rooms/' + currentRoomCode + '/priorityQuestions').push(text).then(() => {
+            inputField.value = "";
+            let counterMsg = document.getElementById(type === 'lobby' ? 'q-counter-msg-lobby' : 'q-counter-msg-game');
+            counterMsg.innerText = "✓ Հարցն ավարտվեց և հերթում ստացավ ԱՌԱՋՆԱՀԵՐԹՈՒԹՅՈՒՆ:";
+            setTimeout(() => { counterMsg.innerText = ""; }, 4000);
         });
     }
 
-    // ԼՍԵԼ ՍԵՆՅԱԿԻՆ
+    function kickPlayer(playerId) {
+        if(confirm("Վստա՞հ եք, որ ուզում եք հեռացնել այս մասնակցին:")) {
+            db.ref('fun_rooms/' + currentRoomCode + '/players/' + playerId).remove();
+        }
+    }
+
     function listenToRoom() {
-        // 1. Խաղացողների թարմացում
         db.ref('fun_rooms/' + currentRoomCode + '/players').on('value', snap => {
+            if(myId && snap.exists() && !snap.hasChild(myId)) {
+                alert("Խաղավարը հեռացրել է Ձեզ խաղից:");
+                location.reload();
+                return;
+            }
+
             if(!snap.exists()) return;
             let players = snap.val();
             
             let lobbyHtml = "";
-            Object.values(players).forEach(p => {
-                lobbyHtml += `<div class="player-row"><span>👤 ${p.name}</span> ${p.isHost ? '<span class="badge">Խաղավար</span>' : ''}</div>`;
+            Object.keys(players).forEach(pId => {
+                let p = players[pId];
+                let kickBtn = (isHost && pId !== myId) ? `<button class="btn-kick" onclick="kickPlayer('${pId}')">❌ Հեռացնել</button>` : '';
+                lobbyHtml += `<div class="player-row"><span>👤 ${p.name} ${p.isHost ? '<span class="badge">Խաղավար</span>' : ''}</span> ${kickBtn}</div>`;
             });
             document.getElementById('lobby-players-container').innerHTML = lobbyHtml;
 
             let voteHtml = "";
             Object.keys(players).forEach(pId => {
-                voteHtml += `<button class="btn-vote" onclick="submitMyVote('${pId}')">👤 ${players[pId].name}</button>`;
+                voteHtml += `<button class="btn-vote" id="vote-btn-${pId}" onclick="submitMyVote('${pId}')">👤 ${players[pId].name}</button>`;
             });
             document.getElementById('voting-buttons-container').innerHTML = voteHtml;
         });
 
-        // 2. Լսել սեփական ավելացված հարցերը և միացնել հին հարցերին
-        db.ref('fun_rooms/' + currentRoomCode + '/customQuestions').on('value', snap => {
-            localQuestionsList = [...defaultQuestions]; // Վերականգնում ենք ստանդարտ ցուցակը
+        db.ref('fun_rooms/' + currentRoomCode + '/priorityQuestions').on('value', snap => {
             if(snap.exists()) {
-                let customQs = Object.values(snap.val());
-                localQuestionsList = localQuestionsList.concat(customQs); // Ավելացնում ենք նոր հարցերը
+                priorityQuestionsList = Object.entries(snap.val()); 
+            } else {
+                priorityQuestionsList = [];
             }
         });
 
-        // 3. Խաղի ընթացքի թարմացում
+        db.ref('fun_rooms/' + currentRoomCode + '/chat').on('value', snap => {
+            let chatBox = document.getElementById('chat-messages-box');
+            if(!snap.exists()) {
+                chatBox.innerHTML = "<p style='color:#666;'>Չատը դատարկ է: Գրեք առաջին նամակը...</p>";
+                return;
+            }
+            let messages = snap.val();
+            let chatHtml = "";
+            Object.values(messages).forEach(m => {
+                chatHtml += `<div class="chat-msg"><span class="chat-name">${m.sender}:</span> ${m.text}</div>`;
+            });
+            chatBox.innerHTML = chatHtml;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
         db.ref('fun_rooms/' + currentRoomCode).on('value', snap => {
             if(!snap.exists()) return;
             let room = snap.val();
@@ -302,26 +442,35 @@
                 document.getElementById('current-question-txt').innerText = room.currentQuestion;
                 
                 if(room.voteStatus === "active") {
+                    // Ստուգում ենք՝ արդյոք տվյալ խաղացողն արդեն քվեարկել է այս տուրում
+                    let hasVoted = room.votes && room.votes[myId];
+                    
+                    if(hasVoted) {
+                        document.getElementById('vote-prompt-zone').classList.add('hidden');
+                        document.getElementById('vote-voted-msg').classList.remove('hidden');
+                    } else {
+                        document.getElementById('vote-prompt-zone').classList.remove('hidden');
+                        document.getElementById('vote-voted-msg').classList.add('hidden');
+                    }
+
                     document.getElementById('voting-area').classList.remove('hidden');
                     document.getElementById('results-area').classList.add('hidden');
+                    
                     if(isHost) {
-                        document.getElementById('host-game-controls').classList.remove('hidden');
+                        document.getElementById('host-stop-vote-area').classList.remove('hidden');
                     }
                     
-                    // ԱՎՏՈՄԱՏ ԱՎԱՐՏԻ ՍՏՈՒԳՈՒՄ
                     if(room.players && room.votes) {
                         let totalPlayers = Object.keys(room.players).length;
                         let totalVotes = Object.keys(room.votes).length;
-                        
                         if(totalVotes >= totalPlayers && isHost) {
                             stopVoting();
                         }
                     }
-
                 } else if(room.voteStatus === "finished") {
                     document.getElementById('voting-area').classList.add('hidden');
                     document.getElementById('results-area').classList.remove('hidden');
-                    document.getElementById('host-game-controls').classList.add('hidden');
+                    document.getElementById('host-stop-vote-area').classList.add('hidden');
                     
                     if(isHost) {
                         document.getElementById('host-next-area').classList.remove('hidden');
@@ -334,23 +483,27 @@
         });
     }
 
-    // ՀԱՋՈՐԴ ՀԱՐՑԸ
     function nextQuestion() {
-        // Ընտրում ենք պատահական հարց թարմացված ցուցակից (որտեղ արդեն կան նաև սեփական գրածները)
-        let randomQ = localQuestionsList[Math.floor(Math.random() * localQuestionsList.length)];
-        
+        let nextQ = "";
+
+        if(priorityQuestionsList.length > 0) {
+            let [dbKey, dbText] = priorityQuestionsList[0];
+            nextQ = dbText;
+            db.ref('fun_rooms/' + currentRoomCode + '/priorityQuestions/' + dbKey).remove();
+        } else {
+            nextQ = defaultQuestions[Math.floor(Math.random() * defaultQuestions.length)];
+        }
+
         db.ref('fun_rooms/' + currentRoomCode).update({
             status: "playing",
-            currentQuestion: randomQ,
+            currentQuestion: nextQ,
             voteStatus: "active",
-            votes: {} 
+            votes: {} // Մաքրում ենք հին տուրի ձայները
         });
     }
 
     function submitMyVote(votedPlayerId) {
-        db.ref('fun_rooms/' + currentRoomCode + '/votes/' + myId).set(votedPlayerId).then(() => {
-            document.getElementById('voting-area').innerHTML = `<h3>✓ Ձեր անոնիմ ձայնը գրանցված է: Սպասում ենք մյուսներին...</h3>`;
-        });
+        db.ref('fun_rooms/' + currentRoomCode + '/votes/' + myId).set(votedPlayerId);
     }
 
     function stopVoting() {
@@ -384,16 +537,19 @@
         });
         
         document.getElementById('results-container').innerHTML = html;
-        
-        document.getElementById('voting-area').innerHTML = `
-            <h3>🗳️ Ընտրեք համապատասխան մասնակցին.</h3>
-            <div id="voting-buttons-container"></div>
-        `;
-        let voteHtml = "";
-        Object.keys(players).forEach(pId => {
-            voteHtml += `<button class="btn-vote" onclick="submitMyVote('${pId}')">👤 ${players[pId].name}</button>`;
+    }
+
+    function sendChatMessage() {
+        let input = document.getElementById('chat-input-msg');
+        let text = input.value.trim();
+        if(!text) return;
+
+        db.ref('fun_rooms/' + currentRoomCode + '/chat').push({
+            sender: myName,
+            text: text
+        }).then(() => {
+            input.value = "";
         });
-        document.getElementById('voting-buttons-container').innerHTML = voteHtml;
     }
 
     function leaveRoom() {
